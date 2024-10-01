@@ -1,5 +1,7 @@
-import TreeView from "@/feature/tree/components/tree-view";
-import { TreeNode } from "../lib/tree/tree.types";
+"use client";
+import { TreeNode } from "@/lib/tree/tree.types";
+import { Reorder } from "framer-motion";
+import { useState } from "react";
 
 const dummyData: TreeNode[] = [
   {
@@ -346,11 +348,68 @@ const dummyData: TreeNode[] = [
   },
 ];
 
-export default function Home() {
+function buildFlatTree(nodes, parentId = null, path = "", depth = 0) {
+  let result = [];
+  nodes
+    .filter((node) => node.parentId === parentId)
+    .forEach((node) => {
+      const newPath = path ? `${path}/${node.name}` : node.name;
+      result.push({ ...node, path: newPath, depth });
+      result = result.concat(buildFlatTree(nodes, node.id, newPath, depth + 1));
+    });
+  return result;
+}
+
+const allNodes = buildFlatTree(dummyData);
+
+export default function ReorderClient() {
+  const [items, setItems] = useState(allNodes);
+
+  const collapse = (id: string) => {
+    const item = items.find((item) => item.id === id);
+    if (!item) return;
+    const children = items.filter((item) => item.path.startsWith(item.path));
+    const newItems = items.filter((item) => !item.path.startsWith(item.path));
+    setItems(newItems);
+  };
+
+  const expand = (id: string) => {
+    const item = items.find((item) => item.id === id);
+    if (!item) return;
+    const children = allNodes.filter((item) => item.path.startsWith(item.path));
+    const newItems = [...items, ...children];
+    setItems(newItems);
+  };
+
   return (
-    <main className="flex min-h-screen flex-col p-4">
-      <h1 className="sr-only">Tree View</h1>
-      <TreeView initialTree={dummyData} />
-    </main>
+    <Reorder.Group
+      axis="y"
+      values={items.map((item) => item.id)}
+      onReorder={(newOrder) => {
+        console.log(newOrder);
+        setItems(newOrder.map((id) => items.find((item) => item.id === id)!));
+      }}
+    >
+      {items.map((item) => (
+        <Reorder.Item
+          key={item.id}
+          value={item.id}
+          className="bg-gray-100 p-4 mb-2 text-black flex"
+        >
+          {Array.from({ length: item.depth }).map((_, i) => (
+            <span key={i} className="w-4" />
+          ))}
+          <span
+            onClick={() => {
+              collapse(item.id);
+            }}
+            className="cursor-pointer"
+          >
+            {item.type === "directory" ? "📁" : "📄"}
+          </span>
+          <span>{item.path}</span>
+        </Reorder.Item>
+      ))}
+    </Reorder.Group>
   );
 }
